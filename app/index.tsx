@@ -1,23 +1,88 @@
-import { Link } from "expo-router";
 import { useEffect, useState } from "react";
-import { ScrollView, Image, Text, View, StyleSheet } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import PokemonCard from "./components/PokemonCard";
+import fetchPokemonList, { Pokemon } from "./lib/api";
 
-interface Pokemon {
-  name: string;
-  imageFront: string;
-  imageBack: string;
-  types: PokemonType[];
+export default function Index() {
+  const [pokemons, setPokemons] = useState<Pokemon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    try {
+      setLoading(true);
+      const list = await fetchPokemonList(100);
+      setPokemons(list);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filtered = pokemons.filter((p) =>
+    p.name.includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1, padding: 16 }}>
+      <Text style={styles.header}>Pokedex</Text>
+
+      <TextInput
+        placeholder="Search by Pokemon's name"
+        value={search}
+        onChangeText={setSearch}
+        style={styles.search}
+      />
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(i) => i.name}
+        numColumns={2}
+        columnWrapperStyle={{
+          justifyContent: "space-around",
+          marginBottom: 22,
+        }}
+        renderItem={({ item }) => (
+          <PokemonCard pokemon={item} style={{ width: "48%" }} />
+        )}
+      />
+    </View>
+  );
 }
 
-interface PokemonType {
-  type: {
-    name: string;
-    url: string;
-  };
-}
-
-// another option for styling other than inline
 const styles = StyleSheet.create({
+  header: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  search: {
+    borderWidth: 1,
+    borderColor: "black",
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 28,
+  },
   name: {
     fontSize: 28,
     fontWeight: "bold",
@@ -30,91 +95,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-
-const colorsByType: Record<string, string> = {
-  normal: "#A8A77A",
-  fire: "#EE8130",
-  water: "#6390F0",
-  electric: "#F7D02C",
-  grass: "#7AC74C",
-  ice: "#96D9D6",
-  fighting: "#C22E28",
-  poison: "#A33EA1",
-  ground: "#E2BF65",
-  flying: "#A98FF3",
-  psychic: "#F95587",
-  bug: "#A6B91A",
-  rock: "#B6A136",
-  ghost: "#735797",
-  dragon: "#6F35FC",
-  dark: "#705746",
-  steel: "#B7B7CE",
-  fairy: "#D685AD",
-};
-
-export default function Index() {
-  const [pokemons, setPokemons] = useState<Pokemon[]>([]);
-
-  useEffect(() => {
-    fetchPokemons();
-  }, []);
-
-  async function fetchPokemons() {
-    try {
-      const response = await fetch(
-        "https://pokeapi.co/api/v2/pokemon?limit=20"
-      );
-      const data = await response.json();
-
-      // fetch detailed info for each Pokemon in parallel
-      const detailedPokemons = await Promise.all(
-        data.results.map(async (pokemon: any) => {
-          const res = await fetch(pokemon.url);
-          const details = await res.json();
-          return {
-            name: pokemon.name,
-            imageFront: details.sprites.front_default,
-            imageBack: details.sprites.back_default,
-            types: details.types,
-          };
-        })
-      );
-      setPokemons(detailedPokemons);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  return (
-    <ScrollView contentContainerStyle={{ gap: 16, padding: 16 }}>
-      {pokemons.map((pokemon) => (
-        <Link
-          key={pokemon.name}
-          href={{ pathname: "/details", params: { name: pokemon.name } }} //passing parameters to the details page
-          style={{
-            backgroundColor: colorsByType[pokemon.types[0].type.name] + 30,
-            padding: 20,
-            borderRadius: 20,
-          }}
-        >
-          <View>
-            <Text style={styles.name}>{pokemon.name}</Text>
-            <Text style={styles.type}>{pokemon.types[0].type.name}</Text>
-
-            <View style={{ flexDirection: "row" }}>
-              {/*Image with inline style*/}
-              <Image
-                source={{ uri: pokemon.imageFront }}
-                style={{ width: 150, height: 150 }}
-              />
-              <Image
-                source={{ uri: pokemon.imageBack }}
-                style={{ width: 150, height: 150 }}
-              />
-            </View>
-          </View>
-        </Link>
-      ))}
-    </ScrollView>
-  );
-}
